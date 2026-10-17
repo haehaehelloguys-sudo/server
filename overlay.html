@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>ANF Overlay</title>
+    <style>
+        :root {
+            --w: 680px;
+            --h: 80px;
+            --fs: 22px;
+            --bg: rgba(18, 18, 18, 0.92);
+            --red: #ff3b3b;
+            --orange: #ff9500;
+            --lightgreen: #9ee852;
+            --green: #34c759;
+            --purple: #c77dff;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+            color: #fff;
+        }
+        #bar {
+            width: var(--w);
+            height: var(--h);
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 0 24px;
+            box-sizing: border-box;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+            transition: opacity 0.3s;
+        }
+        #bar.stale { opacity: 0.35; }
+        #left {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 120px;
+        }
+        #name {
+            font-size: 22px;
+            font-weight: bold;
+            letter-spacing: -0.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 140px;
+        }
+        #judgements {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+        }
+        #judgements span {
+            min-width: 2ch;
+            text-align: center;
+        }
+        .j-red { color: var(--red); }
+        .j-orange { color: var(--orange); }
+        .j-lightgreen { color: var(--lightgreen); }
+        .j-green { color: var(--green); }
+        .j-purple { color: var(--purple); }
+
+        #acc {
+            font-size: 30px;
+            font-weight: 800;
+            min-width: 150px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -1px;
+        }
+    </style>
+</head>
+<body>
+    <div id="bar" class="stale">
+        <div id="left">
+            <div id="name">Player Name</div>
+        </div>
+        <div id="judgements">
+            <span class="j-red" id="j-0">0</span>
+            <span class="j-orange" id="j-1">0</span>
+            <span class="j-lightgreen" id="j-2">0</span>
+            <span class="j-green" id="j-3">0</span>
+            <span class="j-green" id="j-4">0</span>
+            <span class="j-lightgreen" id="j-5">0</span>
+            <span class="j-red" id="j-6">0</span>
+            <span class="j-purple" id="j-death">D0</span>
+        </div>
+        <div id="acc">100.00%</div>
+    </div>
+
+    <script>
+        const q = new URLSearchParams(location.search);
+        const room = q.get('room') || 'anf-final';
+        const player = (q.get('player') || 'A').toUpperCase();
+        const interval = Math.max(100, +(q.get('interval') || 250));
+        const STALE_MS = 5000;
+        const $ = id => document.getElementById(id);
+        let lastSeq = -1, lastChange = 0;
+        const apiBase = location.origin;
+
+        async function tick() {
+            try {
+                const r = await fetch(apiBase + '/api/state?room=' + encodeURIComponent(room), { cache: 'no-store' });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const response = await r.json();
+                const d = response && response.players ? response.players[player] : null;
+                if (!d) throw new Error('player not connected');
+                if (d.seq !== lastSeq) { lastSeq = d.seq; lastChange = Date.now(); }
+                const fresh = Date.now() - lastChange < STALE_MS && !d.stale && d.ok;
+                $('bar').classList.toggle('stale', !fresh);
+                $('name').textContent = d.name || ('Player ' + player);
+
+                if (Number.isFinite(Number(d.acc))) {
+                    $('acc').textContent = Number(d.acc).toFixed(2) + '%';
+                } else {
+                    $('acc').textContent = '100.00%';
+                }
+
+                if (Array.isArray(d.rawCounts)) {
+                    for (let idx = 0; idx <= 6; idx++) {
+                        $('j-' + idx).textContent = d.rawCounts[idx] !== undefined ? d.rawCounts[idx] : 0;
+                    }
+                    const missCount = Number(d.rawCounts[8] || 0);
+                    const overloadCount = Number(d.rawCounts[9] || 0);
+                    $('j-death').textContent = 'D' + (missCount + overloadCount);
+                }
+            } catch (e) {
+                $('bar').classList.add('stale');
+            }
+            setTimeout(tick, interval);
+        }
+        tick();
+    </script>
+</body>
+</html>

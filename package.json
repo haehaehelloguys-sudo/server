@@ -1,0 +1,8 @@
+{
+  "name": "anfoverlay-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ANFOverlay two-player score relay and OBS overlay",
+  "scripts": {"start": "node server.js", "test": "node test.js"},
+  "engines": {"node": ">=18"}
+}
